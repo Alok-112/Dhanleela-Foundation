@@ -48,7 +48,10 @@ export default function Contact() {
               >
                 Instagram
               </a>
-              <a href="#" className="text-green-600 hover:underline">
+              <a
+                href="https://www.facebook.com/share/16U4A3D9jN/"
+                className="text-green-600 hover:underline"
+              >
                 Facebook
               </a>
               <a href="#" className="text-green-600 hover:underline">

@@ -8,21 +8,95 @@ export default function Donate() {
     message: "",
   });
 
+  const [loading, setLoading] = useState(false);
+
+  const loadScript = (src) =>
+    new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.onload = () => resolve(true);
+      document.body.appendChild(script);
+    });
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleDonate = async (e) => {
     e.preventDefault();
-    // Later: Trigger backend API to send OTP & Razorpay
-    alert("Feature coming soon!");
+    setLoading(true);
+
+    if (!form.name || !form.phone || !form.amount) {
+      alert("Please fill in all required fields.");
+      setLoading(false);
+      return;
+    }
+
+    await loadScript("https://checkout.razorpay.com/v1/checkout.js");
+
+    try {
+      const res = await fetch("http://localhost:5000/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: form.amount, name: form.name }),
+      });
+
+      const data = await res.json();
+
+      const options = {
+        key: data.key,
+        amount: form.amount * 100,
+        currency: "INR",
+        name: "Dhanleela Foundation",
+        description: "Donation",
+        order_id: data.orderId,
+        handler: async function (response) {
+          const verifyRes = await fetch("http://localhost:5000/api/payments/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              name: form.name,
+              phone: form.phone,
+              amount: form.amount,
+              message: form.message,
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            alert("🎉 Thank you for your donation!");
+            setForm({ name: "", phone: "", amount: "", message: "" });
+          } else {
+            alert("Payment verification failed.");
+          }
+        },
+        prefill: {
+          name: form.name,
+          contact: form.phone,
+        },
+        theme: {
+          color: "#16a34a",
+        },
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      paymentObject.open();
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert("Something went wrong while processing your payment.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="max-w-xl mx-auto px-4 py-12">
       <h1 className="text-3xl font-bold text-center mb-6 text-green-700">Make a Donation</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 shadow-md rounded-lg space-y-4">
+      <form onSubmit={handleDonate} className="bg-white p-6 shadow-md rounded-lg space-y-4">
         <input
           type="text"
           name="name"
@@ -62,8 +136,9 @@ export default function Donate() {
         <button
           type="submit"
           className="bg-green-600 text-white w-full py-2 rounded font-medium hover:bg-green-700"
+          disabled={loading}
         >
-          Donate & Verify
+          {loading ? "Processing..." : "Donate & Pay"}
         </button>
       </form>
     </div>
